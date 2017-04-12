@@ -82,7 +82,9 @@ public class GMPeriodicService extends IntentService {
                 e.printStackTrace();
             }
         }
-        object.put("alive","1");
+        final DateFormat df = new SimpleDateFormat("MM/dd HH:mm:ss");
+        final Date date = new Date(System.currentTimeMillis());
+        object.put("alive",df.format(date));
 
 //        object.saveInBackground();
 
