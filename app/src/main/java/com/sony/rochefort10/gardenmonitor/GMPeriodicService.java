@@ -62,6 +62,7 @@ public class GMPeriodicService extends IntentService {
                 fileInputStream = openFileInput(dataFilePath);
                 byte[] data = new byte[fileInputStream.available()];
                 fileInputStream.read(data);
+
                 ParseFile Pfile = new ParseFile("data.txt", data);
                 Pfile.saveInBackground();
                 /*
@@ -82,11 +83,13 @@ public class GMPeriodicService extends IntentService {
         object.put("alive","1");
 
 //        object.saveInBackground();
+/*
         try {
             object.save();
         } catch (com.parse.ParseException e) {
             e.printStackTrace();
         }
+        */
         Log.d("Parse","Put data finished.");
 
     }

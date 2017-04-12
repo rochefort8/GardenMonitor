@@ -31,99 +31,95 @@ import java.util.Formatter;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import static com.sony.rochefort10.gardenmonitor.LogUtil.TAG;
 
-public class MonitorService extends Service implements SensorEventListener {
 
-    Handler mHandler ;
-//    static final int period_ms = 1000*60*5;
-    static final int period_ms = 1000;
+public class GMMonitorService extends Service implements SensorEventListener {
+
+//    Handler mHandler ;
 
     private SensorManager mSensorManager;
     private Sensor mLightSensor;
+
+    private float mLightValue ;
     private int mBatteryScale ;
     private int mBatteryLevel ;
 
-    private float mLightValue ;
-
     private String dataFilePath = "logdata000.txt";
     static final String BR = System.getProperty("line.separator");
-    private int fileNameIndex = 0;
-
-    private Timer mTimer ;
-    private TimerTask mTimerTask ;
-
+    private PendingIntent mPendingIntent ;
     private BroadcastReceiver mReceiver;
 
-
-
-    public MonitorService() {
-    }
-
-    private void createDataFilePath() {
-        Formatter fm = new Formatter();
-        fm.format("logdata%03d.txt", fileNameIndex);
-        dataFilePath = fm.toString() ;
+    public GMMonitorService() {
     }
 
     @Override
     public void onCreate() {
 
-        Log.i("TestService", "onCreate");
+        Log.d(TAG(this),"onCreate");
 
+        // Sensor listener
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         mLightSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
-
         mSensorManager.registerListener (this,
                 mLightSensor,
                 SensorManager.SENSOR_DELAY_NORMAL);
 
-
+        // Battery monitor
         IntentFilter filter=new IntentFilter();
         filter.addAction(Intent.ACTION_BATTERY_CHANGED);
         registerReceiver(mBatteryChargerStatusReceiver,filter);
 
+        // Alarm manager
         Intent intent = new Intent(this, GMBroadcastReceiver.class);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
-
+        mPendingIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
         AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
         am.setInexactRepeating(AlarmManager.RTC_WAKEUP,
-               System.currentTimeMillis(), 1000*60, pendingIntent);
+                System.currentTimeMillis(), 1000*60, mPendingIntent);
 
+        // Message receiver
         mReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                Log.d("Received",intent.getAction());
+                Log.d(TAG(this),"onRecieve:" + intent.getAction());
                 IntentFilter filter=new IntentFilter();
                 filter.addAction(Intent.ACTION_BATTERY_CHANGED);
                 registerReceiver(mBatteryChargerStatusReceiver,filter);
 
             }
         };
-
-//        IntentFilter filter = new IntentFilter();
         filter = new IntentFilter();
         filter.addAction("action1");
         LocalBroadcastManager.getInstance(getApplicationContext()).registerReceiver(mReceiver, filter);
     }
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.i("TestService", "onStartCommand");
-        return START_STICKY;
-    }
-
-    @Override
     public void onDestroy() {
-        Log.i("TestService", "onDestroy");
-        if (mHandler != null) {
-            mHandler.removeCallbacksAndMessages(null);
-        }
+        Log.d(TAG(this), "onDestroy");
+
+        // Sensor listener
         if (mSensorManager != null) {
             mSensorManager.unregisterListener(this, mLightSensor);
         }
+
+        // Battery Monitor
         unregisterReceiver(mBatteryChargerStatusReceiver);
 
+        // Alarm manager
+        if (mPendingIntent != null) {
+            AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
+            am.cancel(mPendingIntent);
+        }
+
+        // Message receiver
         LocalBroadcastManager.getInstance(getApplicationContext()).unregisterReceiver(mReceiver);
+
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG(this), "onStartCommand");
+        return START_STICKY;
     }
 
     @Override
@@ -135,7 +131,7 @@ public class MonitorService extends Service implements SensorEventListener {
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        // accuracy に変更があった時の処理
+        Log.d(TAG(this), "onAccuracyChanged");
     }
 
     @Override
@@ -145,12 +141,11 @@ public class MonitorService extends Service implements SensorEventListener {
         float[] values = event.values;
         long timestamp = event.timestamp;
 
-        // 温度センサー
         if(sensor.getType() == Sensor.TYPE_LIGHT){
-            // 温度
-
             float newValue = values[0] ;
+//            Log.d(TAG(this), "TYPE_LIGHT = " + String.valueOf(values[0]));
 
+            // Send value to MainActivity
             Intent i = new Intent();
             i.setAction("action_light");
             i.putExtra("value_light",newValue) ;
@@ -161,13 +156,8 @@ public class MonitorService extends Service implements SensorEventListener {
                 return ;
             }
             mLightValue = values[0] ;
-//            Log.d("SENSOR_DATA", "TYPE_LIGHT = " + String.valueOf(values[0]));
 
-            // Write file
-            String string = getCurrentDate() + ',' +
-                            String.valueOf(mLightValue) + ',' +
-                            String.valueOf(mBatteryLevel) + BR ;
-            writeData(string);
+            writeData();
         }
     }
 
@@ -189,7 +179,11 @@ public class MonitorService extends Service implements SensorEventListener {
         }
     };
 
-    private void writeData(String string) {
+    private void writeData() {
+        String string = getCurrentDate() + ',' +
+                String.valueOf(mLightValue) + ',' +
+                String.valueOf(mBatteryLevel) + BR ;
+
         try {
             FileOutputStream fileOutputStream = openFileOutput(dataFilePath, MODE_PRIVATE|MODE_APPEND);
             fileOutputStream.write(string.getBytes());

@@ -40,9 +40,8 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    private SensorManager manager;
-
     boolean bStarted = false ;
+    Intent mMonitorServiceIntent ;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,10 +60,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        startService(new Intent(MainActivity.this, MonitorService.class));
-
         Button button_service = (Button) findViewById(R.id.button_start_service);
-        // ボタンがクリックされた時に呼び出されるコールバックリスナーを登録します
         button_service.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -73,15 +69,28 @@ public class MainActivity extends AppCompatActivity {
 
         });
 
+        // Start monitor service
+        mMonitorServiceIntent = new Intent(MainActivity.this, GMMonitorService.class) ;
+        startService(mMonitorServiceIntent);
     }
 
+    @Override
+    protected  void onDestroy() {
+        super.onDestroy();
+
+        // Terminate monitor service
+        if (mMonitorServiceIntent != null) {
+            stopService(mMonitorServiceIntent);
+        }
+    }
 
     @Override
     protected void onResume() {
         super.onResume();
+
+        // Resume comminication between monitor service and me
         IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
         filter.addAction("action_light");
-//        filter.addAction(Intent.ACTION_BATTERY_CHANGED);
         LocalBroadcastManager.getInstance(getApplicationContext()).registerReceiver(mReceiver,filter);
     }
 
@@ -89,6 +98,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
 
+        // Pause comminication between monitor service and me
         LocalBroadcastManager.getInstance(getApplicationContext()).unregisterReceiver(mReceiver);
     }
 
@@ -99,7 +109,6 @@ public class MainActivity extends AppCompatActivity {
                 .server("https://parseapi.back4app.com/")
                 .build()
         );
-
         ParseACL defaultACL = new ParseACL();
         defaultACL.setPublicReadAccess(true);
         ParseACL.setDefaultACL(defaultACL, true);
@@ -109,7 +118,6 @@ public class MainActivity extends AppCompatActivity {
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            //           Log.d("Main.received",intent.getAction());
             if (intent.getAction().equals("action_light")) {
                 float f = intent.getFloatExtra("value_light",0.0f) ;
                 TextView textview = (TextView) findViewById(R.id.text_light);
@@ -126,11 +134,4 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
-
-    private void sendSyncBroadcast() {
-
-        Intent i = new Intent();
-        i.setAction("action1");
-        LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcastSync(i);
-    }
 }
