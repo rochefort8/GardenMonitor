@@ -49,8 +49,10 @@ public class GMMonitorService extends Service implements SensorEventListener {
     static final String BR = System.getProperty("line.separator");
     private PendingIntent mPendingIntent ;
     private BroadcastReceiver mReceiver;
+    private boolean bIsSensorInfoShown = false ;
 
     public GMMonitorService() {
+        bIsSensorInfoShown = false ;
     }
 
     @Override
@@ -81,16 +83,19 @@ public class GMMonitorService extends Service implements SensorEventListener {
         mReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                Log.d(TAG(this),"onRecieve:" + intent.getAction());
-                IntentFilter filter=new IntentFilter();
-                filter.addAction(Intent.ACTION_BATTERY_CHANGED);
-                registerReceiver(mBatteryChargerStatusReceiver,filter);
+                Log.d(TAG(this), "onRecieve:" + intent.getAction());
 
+                if (intent.getStringExtra("periodic_service").equals("start")) {
+                    startPeriodicService();
+                } else if (intent.getStringExtra("periodic_service").equals("stop")) {
+                    stopPeriodicService();
+                }
             }
         };
         filter = new IntentFilter();
         filter.addAction("action1");
         LocalBroadcastManager.getInstance(getApplicationContext()).registerReceiver(mReceiver, filter);
+
     }
 
     @Override
@@ -105,15 +110,10 @@ public class GMMonitorService extends Service implements SensorEventListener {
         // Battery Monitor
         unregisterReceiver(mBatteryChargerStatusReceiver);
 
-        // Alarm manager
-        if (mPendingIntent != null) {
-            AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
-            am.cancel(mPendingIntent);
-        }
-
         // Message receiver
         LocalBroadcastManager.getInstance(getApplicationContext()).unregisterReceiver(mReceiver);
 
+        stopPeriodicService();
     }
 
     @Override
@@ -131,7 +131,7 @@ public class GMMonitorService extends Service implements SensorEventListener {
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        Log.d(TAG(this), "onAccuracyChanged");
+        Log.d(TAG(this), "onAccuracyChanged to " + Integer.toString(accuracy));
     }
 
     @Override
@@ -143,7 +143,7 @@ public class GMMonitorService extends Service implements SensorEventListener {
 
         if(sensor.getType() == Sensor.TYPE_LIGHT){
             float newValue = values[0] ;
-//            Log.d(TAG(this), "TYPE_LIGHT = " + String.valueOf(values[0]));
+            Log.d(TAG(this), "TYPE_LIGHT = " + String.valueOf(values[0]));
 
             // Send value to MainActivity
             Intent i = new Intent();
@@ -158,6 +158,10 @@ public class GMMonitorService extends Service implements SensorEventListener {
             mLightValue = values[0] ;
 
             writeData();
+            if (!bIsSensorInfoShown) {
+                showSensorInfo(event);
+                bIsSensorInfoShown = true;
+            }
         }
     }
 
@@ -166,15 +170,17 @@ public class GMMonitorService extends Service implements SensorEventListener {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(Intent.ACTION_BATTERY_CHANGED)) {
-                // 電池残量の最大値
+
                 mBatteryScale = intent.getIntExtra("scale", 0);
                 mBatteryLevel = intent.getIntExtra("level", 0);
 
                 String string = String.valueOf(mBatteryLevel) + "/" + String.valueOf(mBatteryScale) ;
-                Log.d("BAT",string);
+                Log.d(TAG(this),"Battery:" + string);
 
                 LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcastSync(intent);
 
+                // Write out at this timing
+                writeData();
             }
         }
     };
@@ -199,5 +205,60 @@ public class GMMonitorService extends Service implements SensorEventListener {
         return df.format(date);
     }
 
+    private void startPeriodicService() {
+        Log.d(TAG(this),"startPeriodicService") ;
+
+        // Alarm manager
+        Intent intent = new Intent(this, GMBroadcastReceiver.class);
+        mPendingIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
+        AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
+        am.setInexactRepeating(AlarmManager.RTC_WAKEUP,
+                System.currentTimeMillis(), 1000*60, mPendingIntent);
+
+    }
+    private void stopPeriodicService() {
+        Log.d(TAG(this),"stopPeriodicService") ;
+
+        // Alarm manager
+        if (mPendingIntent != null) {
+            AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
+            am.cancel(mPendingIntent);
+        }
+    }
+
+    private void showSensorInfo(SensorEvent event){
+        String info = "Name: " + event.sensor.getName() + "\n";
+        info += "Vendor: " + event.sensor.getVendor() + "\n";
+        info += "Type: " + event.sensor.getType() + "\n";
+        info += "StringType: " + event.sensor.getStringType()+ "\n";
+
+        int data = event.sensor.getMinDelay();
+        info += "Mindelay: "+String.valueOf(data) +" usec\n";
+
+        data = event.sensor.getMaxDelay();
+        info += "Maxdelay: "+String.valueOf(data) +" usec\n";
+
+        data = event.sensor.getReportingMode();
+        String stinfo = "unknown";
+        if(data == 0){
+            stinfo = "REPORTING_MODE_CONTINUOUS";
+        }else if(data == 1){
+            stinfo = "REPORTING_MODE_ON_CHANGE";
+        }else if(data == 2){
+            stinfo = "REPORTING_MODE_ONE_SHOT";
+        }
+        info += "ReportingMode: "+stinfo +" \n";
+
+        float fData = event.sensor.getMaximumRange();
+        info += "MaxRange: "+String.valueOf(fData) +" \n";
+
+        fData = event.sensor.getResolution();
+        info += "Resolution: "+String.valueOf(fData) +" m/s^2 \n";
+
+        fData = event.sensor.getPower();
+        info += "Power: "+String.valueOf(fData) +" mA\n";
+
+        Log.d(TAG(this),info) ;
+    }
 }
 

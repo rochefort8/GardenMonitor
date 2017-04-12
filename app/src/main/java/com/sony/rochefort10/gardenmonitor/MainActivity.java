@@ -38,9 +38,11 @@ import java.util.Date;
 import java.util.Formatter;
 import java.util.List;
 
+import static com.sony.rochefort10.gardenmonitor.LogUtil.TAG;
+
 public class MainActivity extends AppCompatActivity {
 
-    boolean bStarted = false ;
+    boolean bPeriodicServiceStarted = false ;
     Intent mMonitorServiceIntent ;
 
     @Override
@@ -55,6 +57,8 @@ public class MainActivity extends AppCompatActivity {
         button0.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+
+
                 Button button = (Button) v;
 
             }
@@ -64,7 +68,16 @@ public class MainActivity extends AppCompatActivity {
         button_service.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+
                 Button button = (Button) v;
+                if (bPeriodicServiceStarted == false) {
+                    startPeriodicService() ;
+                    bPeriodicServiceStarted = true ;
+                } else {
+                    stopPeriodicService() ;
+                    bPeriodicServiceStarted = false ;
+
+                }
             }
 
         });
@@ -134,4 +147,25 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
+
+    private void startPeriodicService() {
+        Log.d(TAG(this),"startPeriodicService") ;
+
+        // Send to GMMonitor service
+        Intent i = new Intent();
+        i.setAction("action1");
+        i.putExtra("periodic_service","start");
+        LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcastSync(i);
+    }
+    private void stopPeriodicService() {
+        Log.d(TAG(this),"stopPeriodicService") ;
+
+        // Send to GMMonitor service
+        Intent i = new Intent();
+        i.setAction("action1");
+        i.putExtra("periodic_service","stop");
+        LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcastSync(i);
+
+    }
+
 }

@@ -16,6 +16,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Formatter;
 
+import static com.sony.rochefort10.gardenmonitor.LogUtil.TAG;
+
 /**
  * Created by rochefort10 on 2017/04/08.
  */
@@ -47,7 +49,7 @@ public class GMPeriodicService extends IntentService {
 
     private void putFileToParse() {
 
-        Log.d("Parse","Put data");
+        Log.d(TAG(this),"Put data");
 
         ParseObject object = new ParseObject("MONO");
 
@@ -83,15 +85,13 @@ public class GMPeriodicService extends IntentService {
         object.put("alive","1");
 
 //        object.saveInBackground();
-/*
+
         try {
             object.save();
         } catch (com.parse.ParseException e) {
             e.printStackTrace();
         }
-        */
         Log.d("Parse","Put data finished.");
-
     }
 
     private void moveFile() {
@@ -103,6 +103,9 @@ public class GMPeriodicService extends IntentService {
         File dstFile = getFileStreamPath( newFileNamgeString ); // Assuming it is in Internal Storage
         srcFile.renameTo ( dstFile );
         Log.d("Moved to",newFileNamgeString);
-
     }
+
+
+
+
 }
