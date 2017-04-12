@@ -72,13 +72,6 @@ public class GMMonitorService extends Service implements SensorEventListener {
         filter.addAction(Intent.ACTION_BATTERY_CHANGED);
         registerReceiver(mBatteryChargerStatusReceiver,filter);
 
-        // Alarm manager
-        Intent intent = new Intent(this, GMBroadcastReceiver.class);
-        mPendingIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
-        AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
-        am.setInexactRepeating(AlarmManager.RTC_WAKEUP,
-                System.currentTimeMillis(), 1000*60, mPendingIntent);
-
         // Message receiver
         mReceiver = new BroadcastReceiver() {
             @Override
